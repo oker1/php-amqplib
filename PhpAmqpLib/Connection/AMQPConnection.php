@@ -498,4 +498,16 @@ class AMQPConnection extends AbstractChannel
         return $this->sock;
     }
 
+    /**
+     * @return bool
+     */
+    public function isConnected()
+    {
+        return $this->sock !== null && $this->sock !== false;
+    }
+
+    public function disconnect()
+    {
+        $this->close_socket();
+    }
 }

@@ -696,16 +696,6 @@ class AMQPChannel extends AbstractChannel
         return (null === $ticket) ? $this->default_ticket : $ticket;
     }
 
-    public function isConnected()
-    {
-        return (bool) $this->is_open;
-    }
-
-    public function disconnect()
-    {
-        return $this->do_close();
-    }
-
     public function setReadTimeout($readTimeout)
     {
         $this->connection->setReadTimeout($readTimeout);
@@ -714,5 +704,15 @@ class AMQPChannel extends AbstractChannel
     public function resetReadTimeout()
     {
         $this->connection->resetReadTimeout();
+    }
+
+    public function isConnected()
+    {
+        return (bool) $this->is_open;
+    }
+
+    public function disconnect()
+    {
+        return $this->do_close();
     }
 }
