@@ -4,12 +4,24 @@ namespace PhpAmqpLib\Wire;
 
 use PhpAmqpLib\Wire\AMQPDecimal;
 use PhpAmqpLib\Wire\BufferedInput;
+use PhpAmqpLib\Exception\ProtocolException;
+use PhpAmqpLib\Exception\TimeoutException;
 
 require_once(__DIR__ . '/BufferedInput.php');
 
 class AMQPReader
 {
-    public function __construct($str, $sock=null)
+    /**
+     * @var integer
+     */
+    private $readTimeout;
+
+    /**
+     * @var integer
+     */
+    private $readTimeoutOriginal;
+
+    public function __construct($str, $sock=null, $readTimeout = 3)
     {
         $this->str = $str;
         if ($sock !== null)
@@ -31,7 +43,18 @@ class AMQPReader
         if(!function_exists("bcmul"))
             throw new \Exception("'bc math' module required");
 
-        $this->buffer_read_timeout = 5; // in seconds
+        $this->readTimeout = $readTimeout;
+        $this->readTimeoutOriginal = $readTimeout;
+    }
+
+    public function setReadTimeout($readTimeout)
+    {
+        $this->readTimeout = $readTimeout;
+    }
+
+    public function resetReadTimeout()
+    {
+        $this->readTimeout = $this->readTimeoutOriginal;
     }
 
     public function close()
@@ -51,12 +74,43 @@ class AMQPReader
         if ($this->sock) {
             $res = '';
             $read = 0;
+            $numberOfSocket = 0;
 
-            while ($read < $n && !feof($this->sock->real_sock()) &&
-                    (false !== ($buf = fread($this->sock->real_sock(), $n - $read)))) {
+            while ($read < $n && !feof($this->sock->real_sock())) {
+                $readStreams = array($this->sock->real_sock());
+                $writeStreams = null;
+                $exceptStreams = null;
+                //suppressing Warning: stream_select(): unable to select [4]: Interrupted system call (max_fd=3)
+                $numberOfSocket = @stream_select($readStreams, $writeStreams, $exceptStreams, $this->readTimeout);
+
+                //unfortunately the stream_select returns immediately false in case of SIGTERM
+                if ($numberOfSocket === false) {
+                    $readStreams = array($this->sock->real_sock());
+                    $writeStreams = null;
+                    $exceptStreams = null;
+                    //suppressing Warning: stream_select(): unable to select [4]: Interrupted system call (max_fd=3)
+                    $numberOfSocket = @stream_select($readStreams, $writeStreams, $exceptStreams, 0, 1);
+                }
+
+                if ($numberOfSocket === false) {
+                    throw new ProtocolException("Error reading data from stream socket");
+                } elseif ($numberOfSocket === 0) {
+                    throw new TimeoutException();
+                }
+
+                $buf = fread($this->sock->real_sock(), $n - $read);
+                if ($buf === false) {
+                    throw new ProtocolException("Error reading data from stream socket");
+                }
                 $read += strlen($buf);
                 $res .= $buf;
             }
+
+/*            while ($read < $n && !feof($this->sock->real_sock()) &&
+                (false !== ($buf = fread($this->sock->real_sock(), $n - $read)))) {
+                $read += strlen($buf);
+                $res .= $buf;
+            }*/
 
             if(strlen($res)!=$n) {
                 throw new \Exception("Error reading data. Recevived " .

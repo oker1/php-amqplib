@@ -75,8 +75,8 @@ class AMQPConnection extends AbstractChannel
             }
 
             stream_set_timeout($this->sock, $read_write_timeout);
-            stream_set_blocking($this->sock, 1);
-            $this->input = new AMQPReader(null, $this->sock);
+            stream_set_blocking($this->sock, 0);
+            $this->input = new AMQPReader(null, $this->sock, $read_write_timeout);
 
             $this->write(self::$AMQP_PROTOCOL_HEADER);
             $this->wait(array("10,10"));
@@ -107,6 +107,16 @@ class AMQPConnection extends AbstractChannel
         }
 
         $this->close_socket();
+    }
+
+    public function setReadTimeout($readTimeout)
+    {
+        $this->input->setReadTimeout($readTimeout);
+    }
+
+    public function resetReadTimeout()
+    {
+        $this->input->resetReadTimeout();
     }
 
     protected function close_socket()
