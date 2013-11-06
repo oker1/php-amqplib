@@ -137,11 +137,13 @@ class AMQPConnection extends AbstractChannel
 
         $len = strlen($data);
         while (true) {
-            if (false === ($written = fwrite($this->sock, $data))) {
-                throw new \Exception ("Error sending data");
+            if (false === ($written = @fwrite($this->sock, $data))) {
+                $this->close_socket();
+                throw new AMQPConnectionException("Error sending data");
             }
             if ($written === 0) {
-                throw new \Exception ("Broken pipe or closed connection");
+                $this->close_socket();
+                throw new AMQPConnectionException("Broken pipe or closed connection");
             }
             $len = $len - $written;
             if ($len > 0) {
@@ -343,6 +345,7 @@ class AMQPConnection extends AbstractChannel
 
         $this->x_close_ok();
 
+        $this->close_socket();
         throw new AMQPConnectionException($reply_code, $reply_text, array($class_id, $method_id));
     }
 
